@@ -148,8 +148,15 @@ export function SessionDetailsModal({
                 <span className="text-sm font-medium">Time Remaining</span>
               </div>
               <span className={cn(
-                "text-sm font-mono",
-                session.timeRemaining < 3600000 ? "text-orange-600" : "text-green-600"
+                "text-sm",
+                session.status === "ACTIVE" && "font-mono",
+                session.status === "ACTIVE" && session.timeRemaining < 3600000 ? "text-orange-600 font-semibold" : 
+                session.status === "ACTIVE" ? "text-green-600" :
+                session.status === "EXPIRED" ? "text-red-600 font-medium" :
+                session.status === "TERMINATED" ? "text-gray-500 italic" :
+                session.status === "SUSPENDED" ? "text-orange-600 font-medium" :
+                session.status === "PENDING" ? "text-blue-600 font-medium" :
+                "text-gray-500"
               )}>
                 {session.timeRemainingFormatted || 'N/A'}
               </span>
