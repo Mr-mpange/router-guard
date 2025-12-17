@@ -361,14 +361,24 @@ export default function Sessions() {
                                 ? "text-warning"
                                 : session.status === "EXPIRED"
                                 ? "text-destructive"
+                                : session.status === "TERMINATED"
+                                ? "text-muted-foreground"
+                                : session.status === "SUSPENDED"
+                                ? "text-warning"
+                                : session.status === "PENDING"
+                                ? "text-blue-600"
                                 : "text-muted-foreground"
                             )}
                           />
                           <span
                             className={cn(
-                              "font-mono",
-                              session.status === "ACTIVE" && session.timeRemaining < 3600000 && "text-warning",
-                              session.status === "EXPIRED" && "text-destructive"
+                              "text-sm",
+                              session.status === "ACTIVE" && "font-mono",
+                              session.status === "ACTIVE" && session.timeRemaining < 3600000 && "text-warning font-semibold",
+                              session.status === "EXPIRED" && "text-destructive font-medium",
+                              session.status === "TERMINATED" && "text-muted-foreground italic",
+                              session.status === "SUSPENDED" && "text-warning font-medium",
+                              session.status === "PENDING" && "text-blue-600 font-medium"
                             )}
                           >
                             {session.timeRemainingFormatted || 'N/A'}

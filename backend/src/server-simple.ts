@@ -774,7 +774,11 @@ app.get('/api/sessions', authenticateToken, async (req, res) => {
       timeRemaining: session.status === 'ACTIVE' ? 
         Math.max(0, session.expiresAt.getTime() - Date.now()) : 0,
       timeRemainingFormatted: session.status === 'ACTIVE' ? 
-        formatDuration(Math.max(0, session.expiresAt.getTime() - Date.now())) : 'N/A',
+        formatDuration(Math.max(0, session.expiresAt.getTime() - Date.now())) : 
+        session.status === 'EXPIRED' ? 'Expired' :
+        session.status === 'TERMINATED' ? 'Terminated' :
+        session.status === 'SUSPENDED' ? 'Suspended' :
+        session.status === 'PENDING' ? 'Pending Payment' : 'N/A',
       durationFormatted: formatDuration(session.package.duration * 60 * 1000),
       bytesUpFormatted: formatBytes(Number(session.bytesUp)),
       bytesDownFormatted: formatBytes(Number(session.bytesDown)),
