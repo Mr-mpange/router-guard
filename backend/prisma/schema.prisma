@@ -1,0 +1,114 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String?
+  role      String @default("ADMIN")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+model Router {
+  id             String       @id @default(cuid())
+  name           String
+  ipAddress      String       @unique
+  macAddress     String?
+  location       String?
+  status         String @default("OFFLINE")
+  lastSeen       DateTime?
+  signalStrength Int?
+  activeUsers    Int          @default(0)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  sessions Session[]
+
+  @@map("routers")
+}
+
+model Package {
+  id          String  @id @default(cuid())
+  name        String
+  duration    Int     // Duration in minutes
+  price       Int     // Price in cents (TZS)
+  description String?
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  sessions Session[]
+  payments Payment[]
+
+  @@map("packages")
+}
+
+model Session {
+  id           String        @id @default(cuid())
+  userId       String?       // For registered users
+  deviceMac    String
+  deviceName   String?
+  ipAddress    String?
+  routerId     String
+  packageId    String
+  status       String @default("ACTIVE")
+  startTime    DateTime      @default(now())
+  endTime      DateTime?
+  expiresAt    DateTime
+  bytesUp      BigInt        @default(0)
+  bytesDown    BigInt        @default(0)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  router  Router  @relation(fields: [routerId], references: [id])
+  package Package @relation(fields: [packageId], references: [id])
+  payment Payment?
+
+  @@map("sessions")
+}
+
+model Payment {
+  id                String        @id @default(cuid())
+  sessionId         String        @unique
+  packageId         String
+  amount            Int           // Amount in cents
+  currency          String        @default("TZS")
+  paymentMethod     String
+  paymentReference  String?       // External payment reference
+  phoneNumber       String?
+  status            String @default("PENDING")
+  paidAt            DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  session Session @relation(fields: [sessionId], references: [id])
+  package Package @relation(fields: [packageId], references: [id])
+
+  @@map("payments")
+}
+
+model SystemSettings {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String
+  type  String @default("string") // string, number, boolean, json
+
+  @@map("system_settings")
+}
+
+// Enums converted to strings for SQLite compatibility
+// UserRole: ADMIN, OPERATOR
+// RouterStatus: ONLINE, OFFLINE, MAINTENANCE  
+// SessionStatus: ACTIVE, EXPIRED, TERMINATED, SUSPENDED
+// PaymentMethod: MPESA, TIGO_PESA, AIRTEL_MONEY, CASH
+// PaymentStatus: PENDING, COMPLETED, FAILED, CANCELLED, REFUNDED

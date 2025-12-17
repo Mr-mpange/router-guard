@@ -91,13 +91,13 @@ export default function Index() {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-fade-in">
             <Link to="/dashboard">
               <Button size="xl" variant="glow" className="gap-2">
-                View Dashboard Demo
+                View Dashboard
                 <ArrowRight className="w-5 h-5" />
               </Button>
             </Link>
             <Link to="/portal">
               <Button size="xl" variant="outline">
-                Try Captive Portal
+                Captive Portal
               </Button>
             </Link>
           </div>

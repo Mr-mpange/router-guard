@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -26,90 +27,54 @@ import {
   Wifi,
   XCircle,
   RefreshCw,
+  Users,
+  AlertCircle,
+  Loader2,
+  Play,
+  Pause,
+  Square,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import { adminApi } from "@/lib/api";
+import { SessionDetailsModal } from "@/components/SessionDetailsModal";
 
 interface Session {
   id: string;
-  deviceName: string;
-  deviceType: "mobile" | "desktop" | "laptop";
-  macAddress: string;
-  ipAddress: string;
-  router: string;
-  package: string;
+  deviceMac: string;
+  deviceName?: string;
+  ipAddress?: string;
+  status: string;
   startTime: string;
-  timeRemaining: string;
-  dataUsed: string;
-  status: "active" | "expiring" | "expired";
+  endTime?: string;
+  expiresAt: string;
+  timeRemaining: number;
+  timeRemainingFormatted: string;
+  durationFormatted: string;
+  bytesUpFormatted: string;
+  bytesDownFormatted: string;
+  statusColor: string;
+  isExpired: boolean;
+  router: {
+    id: string;
+    name: string;
+    location?: string;
+    ipAddress: string;
+  };
+  package: {
+    id: string;
+    name: string;
+    duration: number;
+    price: number;
+  };
+  payment?: {
+    id: string;
+    status: string;
+    paymentMethod: string;
+    amount: number;
+    paidAt?: string;
+  };
 }
-
-const mockSessions: Session[] = [
-  {
-    id: "1",
-    deviceName: "iPhone 14 Pro",
-    deviceType: "mobile",
-    macAddress: "AA:BB:CC:DD:EE:01",
-    ipAddress: "192.168.1.101",
-    router: "Main Lobby",
-    package: "24 Hours",
-    startTime: "2024-01-15 08:30",
-    timeRemaining: "18h 32m",
-    dataUsed: "2.4 GB",
-    status: "active",
-  },
-  {
-    id: "2",
-    deviceName: "MacBook Pro M3",
-    deviceType: "laptop",
-    macAddress: "AA:BB:CC:DD:EE:02",
-    ipAddress: "192.168.1.102",
-    router: "Cafe WiFi",
-    package: "7 Days",
-    startTime: "2024-01-10 14:15",
-    timeRemaining: "5d 12h",
-    dataUsed: "15.8 GB",
-    status: "active",
-  },
-  {
-    id: "3",
-    deviceName: "Samsung Galaxy S23",
-    deviceType: "mobile",
-    macAddress: "AA:BB:CC:DD:EE:03",
-    ipAddress: "192.168.1.103",
-    router: "Main Lobby",
-    package: "24 Hours",
-    startTime: "2024-01-15 22:45",
-    timeRemaining: "45m",
-    dataUsed: "890 MB",
-    status: "expiring",
-  },
-  {
-    id: "4",
-    deviceName: "Windows Desktop",
-    deviceType: "desktop",
-    macAddress: "AA:BB:CC:DD:EE:04",
-    ipAddress: "192.168.1.104",
-    router: "Conference Room",
-    package: "30 Days",
-    startTime: "2023-12-20 10:00",
-    timeRemaining: "22d 8h",
-    dataUsed: "45.2 GB",
-    status: "active",
-  },
-  {
-    id: "5",
-    deviceName: "iPad Pro",
-    deviceType: "laptop",
-    macAddress: "AA:BB:CC:DD:EE:05",
-    ipAddress: "192.168.1.105",
-    router: "Cafe WiFi",
-    package: "24 Hours",
-    startTime: "2024-01-14 12:00",
-    timeRemaining: "0m",
-    dataUsed: "1.2 GB",
-    status: "expired",
-  },
-];
 
 const deviceIcons = {
   mobile: Smartphone,
@@ -118,36 +83,112 @@ const deviceIcons = {
 };
 
 const statusConfig = {
-  active: {
+  ACTIVE: {
     label: "Active",
     dotColor: "bg-success",
     textColor: "text-success",
     bgColor: "bg-success/10",
   },
-  expiring: {
-    label: "Expiring",
-    dotColor: "bg-warning",
-    textColor: "text-warning",
-    bgColor: "bg-warning/10",
-  },
-  expired: {
+  EXPIRED: {
     label: "Expired",
     dotColor: "bg-destructive",
     textColor: "text-destructive",
     bgColor: "bg-destructive/10",
+  },
+  TERMINATED: {
+    label: "Terminated",
+    dotColor: "bg-gray-500",
+    textColor: "text-gray-500",
+    bgColor: "bg-gray-500/10",
+  },
+  SUSPENDED: {
+    label: "Suspended",
+    dotColor: "bg-warning",
+    textColor: "text-warning",
+    bgColor: "bg-warning/10",
   },
 };
 
 export default function Sessions() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedSession, setSelectedSession] = useState<any>(null);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
 
-  const filteredSessions = mockSessions.filter((session) => {
+  useEffect(() => {
+    loadSessions();
+  }, []);
+
+  const loadSessions = async () => {
+    try {
+      setLoading(true);
+      const data = await adminApi.getSessions();
+      setSessions(data.sessions || []);
+    } catch (error) {
+      console.error('Failed to load sessions:', error);
+      toast.error('Failed to load sessions');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTerminateSession = async (sessionId: string) => {
+    try {
+      await adminApi.terminateSession(sessionId);
+      toast.success('Session terminated successfully');
+      loadSessions(); // Reload data
+    } catch (error) {
+      console.error('Failed to terminate session:', error);
+      toast.error('Failed to terminate session');
+    }
+  };
+
+  const handleSuspendSession = async (sessionId: string) => {
+    try {
+      await adminApi.suspendSession(sessionId);
+      toast.success('Session suspended successfully');
+      loadSessions(); // Reload data
+    } catch (error) {
+      console.error('Failed to suspend session:', error);
+      toast.error('Failed to suspend session');
+    }
+  };
+
+  const handleResumeSession = async (sessionId: string) => {
+    try {
+      await adminApi.resumeSession(sessionId);
+      toast.success('Session resumed successfully');
+      loadSessions(); // Reload data
+    } catch (error) {
+      console.error('Failed to resume session:', error);
+      toast.error('Failed to resume session');
+    }
+  };
+
+  const handleExtendSession = async (sessionId: string, minutes: number = 60) => {
+    try {
+      await adminApi.extendSession(sessionId, minutes);
+      toast.success(`Session extended by ${minutes} minutes`);
+      loadSessions(); // Reload data
+    } catch (error) {
+      console.error('Failed to extend session:', error);
+      toast.error('Failed to extend session');
+    }
+  };
+
+  const handleViewDetails = (session: any) => {
+    setSelectedSession(session);
+    setIsDetailsModalOpen(true);
+  };
+
+  const filteredSessions = sessions.filter((session) => {
     const matchesSearch =
-      session.deviceName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      session.macAddress.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      session.ipAddress.includes(searchQuery);
-    const matchesStatus = statusFilter === "all" || session.status === statusFilter;
+      (session.deviceName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      session.deviceMac.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (session.ipAddress || '').includes(searchQuery);
+    const matchesStatus = statusFilter === "all" || session.status === statusFilter.toUpperCase();
     return matchesSearch && matchesStatus;
   });
 
@@ -163,8 +204,8 @@ export default function Sessions() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" className="gap-2">
-              <RefreshCw className="w-4 h-4" />
+            <Button variant="outline" className="gap-2" onClick={loadSessions} disabled={loading}>
+              <RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} />
               Refresh
             </Button>
           </div>
@@ -178,7 +219,7 @@ export default function Sessions() {
             </div>
             <div>
               <p className="text-2xl font-bold">
-                {mockSessions.filter((s) => s.status === "active").length}
+                {sessions.filter((s) => s.status === "ACTIVE").length}
               </p>
               <p className="text-sm text-muted-foreground">Active Sessions</p>
             </div>
@@ -189,7 +230,7 @@ export default function Sessions() {
             </div>
             <div>
               <p className="text-2xl font-bold">
-                {mockSessions.filter((s) => s.status === "expiring").length}
+                {sessions.filter((s) => s.status === "ACTIVE" && s.timeRemaining < 3600000).length}
               </p>
               <p className="text-sm text-muted-foreground">Expiring Soon</p>
             </div>
@@ -200,7 +241,7 @@ export default function Sessions() {
             </div>
             <div>
               <p className="text-2xl font-bold">
-                {mockSessions.filter((s) => s.status === "expired").length}
+                {sessions.filter((s) => s.status === "EXPIRED").length}
               </p>
               <p className="text-sm text-muted-foreground">Expired</p>
             </div>
@@ -210,7 +251,7 @@ export default function Sessions() {
               <Smartphone className="w-6 h-6 text-primary" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{mockSessions.length}</p>
+              <p className="text-2xl font-bold">{sessions.length}</p>
               <p className="text-sm text-muted-foreground">Total Sessions</p>
             </div>
           </div>
@@ -235,8 +276,9 @@ export default function Sessions() {
             <SelectContent>
               <SelectItem value="all">All Status</SelectItem>
               <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="expiring">Expiring</SelectItem>
               <SelectItem value="expired">Expired</SelectItem>
+              <SelectItem value="terminated">Terminated</SelectItem>
+              <SelectItem value="suspended">Suspended</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -258,9 +300,24 @@ export default function Sessions() {
                 </tr>
               </thead>
               <tbody>
-                {filteredSessions.map((session) => {
-                  const DeviceIcon = deviceIcons[session.deviceType];
-                  const status = statusConfig[session.status];
+                {loading ? (
+                  <tr>
+                    <td colSpan={6} className="p-8 text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Loading sessions...</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : filteredSessions.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                      No sessions found
+                    </td>
+                  </tr>
+                ) : filteredSessions.map((session) => {
+                  const DeviceIcon = Smartphone; // Default icon for now
+                  const status = statusConfig[session.status as keyof typeof statusConfig] || statusConfig.ACTIVE;
                   return (
                     <tr
                       key={session.id}
@@ -272,9 +329,9 @@ export default function Sessions() {
                             <DeviceIcon className="w-4 h-4 text-muted-foreground" />
                           </div>
                           <div>
-                            <span className="font-medium block">{session.deviceName}</span>
+                            <span className="font-medium block">{session.deviceName || 'Unknown Device'}</span>
                             <span className="text-xs text-muted-foreground">
-                              Started: {session.startTime}
+                              Started: {new Date(session.startTime).toLocaleString()}
                             </span>
                           </div>
                         </div>
@@ -282,27 +339,27 @@ export default function Sessions() {
                       <td className="p-4">
                         <div className="space-y-1">
                           <code className="text-xs font-mono text-muted-foreground bg-secondary px-2 py-0.5 rounded block w-fit">
-                            {session.macAddress}
+                            {session.deviceMac}
                           </code>
                           <code className="text-xs font-mono text-muted-foreground block">
-                            {session.ipAddress}
+                            {session.ipAddress || 'N/A'}
                           </code>
                         </div>
                       </td>
                       <td className="p-4">
-                        <span className="text-sm">{session.router}</span>
+                        <span className="text-sm">{session.router?.name || 'Unknown'}</span>
                       </td>
                       <td className="p-4">
-                        <span className="font-medium">{session.package}</span>
+                        <span className="font-medium">{session.package?.name || 'Unknown'}</span>
                       </td>
                       <td className="p-4">
                         <div className="flex items-center gap-1.5">
                           <Clock
                             className={cn(
                               "w-4 h-4",
-                              session.status === "expiring"
+                              session.status === "ACTIVE" && session.timeRemaining < 3600000
                                 ? "text-warning"
-                                : session.status === "expired"
+                                : session.status === "EXPIRED"
                                 ? "text-destructive"
                                 : "text-muted-foreground"
                             )}
@@ -310,16 +367,19 @@ export default function Sessions() {
                           <span
                             className={cn(
                               "font-mono",
-                              session.status === "expiring" && "text-warning",
-                              session.status === "expired" && "text-destructive"
+                              session.status === "ACTIVE" && session.timeRemaining < 3600000 && "text-warning",
+                              session.status === "EXPIRED" && "text-destructive"
                             )}
                           >
-                            {session.timeRemaining}
+                            {session.timeRemainingFormatted || 'N/A'}
                           </span>
                         </div>
                       </td>
                       <td className="p-4">
-                        <span className="text-muted-foreground">{session.dataUsed}</span>
+                        <div className="text-sm">
+                          <div>↓ {session.bytesDownFormatted || '0 B'}</div>
+                          <div className="text-xs text-muted-foreground">↑ {session.bytesUpFormatted || '0 B'}</div>
+                        </div>
                       </td>
                       <td className="p-4">
                         <span
@@ -341,12 +401,33 @@ export default function Sessions() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>View Details</DropdownMenuItem>
-                            <DropdownMenuItem>Extend Time</DropdownMenuItem>
-                            <DropdownMenuItem>Change Package</DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive">
-                              Disconnect
+                            <DropdownMenuItem onClick={() => handleViewDetails(session)}>
+                              View Details
                             </DropdownMenuItem>
+                            {session.status === 'ACTIVE' && (
+                              <>
+                                <DropdownMenuItem onClick={() => handleExtendSession(session.id, 60)}>
+                                  Extend +1 Hour
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleExtendSession(session.id, 1440)}>
+                                  Extend +1 Day
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleSuspendSession(session.id)}>
+                                  Suspend
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  className="text-destructive"
+                                  onClick={() => handleTerminateSession(session.id)}
+                                >
+                                  Terminate
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                            {session.status === 'SUSPENDED' && (
+                              <DropdownMenuItem onClick={() => handleResumeSession(session.id)}>
+                                Resume
+                              </DropdownMenuItem>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </td>
@@ -357,6 +438,17 @@ export default function Sessions() {
             </table>
           </div>
         </div>
+
+        {/* Session Details Modal */}
+        <SessionDetailsModal
+          session={selectedSession}
+          open={isDetailsModalOpen}
+          onOpenChange={setIsDetailsModalOpen}
+          onExtend={handleExtendSession}
+          onSuspend={handleSuspendSession}
+          onResume={handleResumeSession}
+          onTerminate={handleTerminateSession}
+        />
       </div>
     </DashboardLayout>
   );

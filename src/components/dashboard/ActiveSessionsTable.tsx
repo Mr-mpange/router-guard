@@ -1,4 +1,5 @@
-import { Clock, MoreVertical, Smartphone, Monitor, Laptop } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Clock, MoreVertical, Smartphone, Monitor, Laptop, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -7,65 +8,28 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { adminApi } from "@/lib/api";
+import { toast } from "sonner";
 
 interface Session {
   id: string;
-  deviceName: string;
-  deviceType: "mobile" | "desktop" | "laptop";
-  macAddress: string;
-  ipAddress: string;
-  package: string;
-  timeRemaining: string;
-  dataUsed: string;
-  status: "active" | "expiring" | "expired";
+  deviceMac: string;
+  deviceName?: string;
+  ipAddress?: string;
+  status: string;
+  timeRemaining: number;
+  timeRemainingFormatted: string;
+  bytesUpFormatted: string;
+  bytesDownFormatted: string;
+  router: {
+    name: string;
+    location?: string;
+  };
+  package: {
+    name: string;
+    duration: number;
+  };
 }
-
-const mockSessions: Session[] = [
-  {
-    id: "1",
-    deviceName: "iPhone 14 Pro",
-    deviceType: "mobile",
-    macAddress: "AA:BB:CC:DD:EE:01",
-    ipAddress: "192.168.1.101",
-    package: "24 Hours",
-    timeRemaining: "18h 32m",
-    dataUsed: "2.4 GB",
-    status: "active",
-  },
-  {
-    id: "2",
-    deviceName: "MacBook Pro",
-    deviceType: "laptop",
-    macAddress: "AA:BB:CC:DD:EE:02",
-    ipAddress: "192.168.1.102",
-    package: "7 Days",
-    timeRemaining: "5d 12h",
-    dataUsed: "15.8 GB",
-    status: "active",
-  },
-  {
-    id: "3",
-    deviceName: "Samsung Galaxy",
-    deviceType: "mobile",
-    macAddress: "AA:BB:CC:DD:EE:03",
-    ipAddress: "192.168.1.103",
-    package: "24 Hours",
-    timeRemaining: "45m",
-    dataUsed: "890 MB",
-    status: "expiring",
-  },
-  {
-    id: "4",
-    deviceName: "Windows PC",
-    deviceType: "desktop",
-    macAddress: "AA:BB:CC:DD:EE:04",
-    ipAddress: "192.168.1.104",
-    package: "30 Days",
-    timeRemaining: "22d 8h",
-    dataUsed: "45.2 GB",
-    status: "active",
-  },
-];
 
 const deviceIcons = {
   mobile: Smartphone,
@@ -74,12 +38,70 @@ const deviceIcons = {
 };
 
 const statusStyles = {
-  active: "bg-success/10 text-success",
-  expiring: "bg-warning/10 text-warning",
-  expired: "bg-destructive/10 text-destructive",
+  ACTIVE: "bg-success/10 text-success",
+  EXPIRED: "bg-destructive/10 text-destructive",
+  TERMINATED: "bg-gray-500/10 text-gray-500",
+  SUSPENDED: "bg-warning/10 text-warning",
 };
 
 export function ActiveSessionsTable() {
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadActiveSessions();
+  }, []);
+
+  const loadActiveSessions = async () => {
+    try {
+      const data = await adminApi.getActiveSessions();
+      setSessions(data.sessions.slice(0, 5)); // Show only first 5 sessions
+    } catch (error) {
+      console.error('Failed to load active sessions:', error);
+      toast.error('Failed to load active sessions');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTerminateSession = async (sessionId: string) => {
+    try {
+      await adminApi.terminateSession(sessionId);
+      toast.success('Session terminated successfully');
+      loadActiveSessions(); // Reload data
+    } catch (error) {
+      console.error('Failed to terminate session:', error);
+      toast.error('Failed to terminate session');
+    }
+  };
+
+  const handleExtendSession = async (sessionId: string, minutes: number = 60) => {
+    try {
+      await adminApi.extendSession(sessionId, minutes);
+      toast.success(`Session extended by ${minutes} minutes`);
+      loadActiveSessions(); // Reload data
+    } catch (error) {
+      console.error('Failed to extend session:', error);
+      toast.error('Failed to extend session');
+    }
+  };
+
+  const handleViewDetails = (session: any) => {
+    const deviceInfo = session.deviceName || 'Unknown Device';
+    const packageInfo = session.package?.name || 'Unknown Package';
+    const timeInfo = session.timeRemainingFormatted || 'N/A';
+    const routerInfo = session.router?.name || 'Unknown Router';
+    const dataInfo = `↓${session.bytesDownFormatted || '0 B'} ↑${session.bytesUpFormatted || '0 B'}`;
+    
+    toast.info(
+      `📱 ${deviceInfo}\n` +
+      `📦 ${packageInfo}\n` +
+      `⏰ ${timeInfo} remaining\n` +
+      `📡 ${routerInfo}\n` +
+      `📊 ${dataInfo}`,
+      { duration: 5000 }
+    );
+  };
   return (
     <div className="glass-card overflow-hidden">
       <div className="p-6 border-b border-border">
@@ -110,8 +132,24 @@ export function ActiveSessionsTable() {
             </tr>
           </thead>
           <tbody>
-            {mockSessions.map((session) => {
-              const DeviceIcon = deviceIcons[session.deviceType];
+            {loading ? (
+              <tr>
+                <td colSpan={8} className="p-8 text-center">
+                  <div className="flex items-center justify-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Loading sessions...</span>
+                  </div>
+                </td>
+              </tr>
+            ) : sessions.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="p-8 text-center text-muted-foreground">
+                  No active sessions
+                </td>
+              </tr>
+            ) : sessions.map((session) => {
+              const DeviceIcon = Smartphone; // Default icon for now
+              const isExpiring = session.status === 'ACTIVE' && session.timeRemaining < 3600000; // Less than 1 hour
               return (
                 <tr
                   key={session.id}
@@ -122,43 +160,42 @@ export function ActiveSessionsTable() {
                       <div className="p-2 rounded-lg bg-secondary">
                         <DeviceIcon className="w-4 h-4 text-muted-foreground" />
                       </div>
-                      <span className="font-medium">{session.deviceName}</span>
+                      <span className="font-medium">{session.deviceName || 'Unknown Device'}</span>
                     </div>
                   </td>
                   <td className="p-4">
                     <code className="text-xs font-mono text-muted-foreground bg-secondary px-2 py-1 rounded">
-                      {session.macAddress}
+                      {session.deviceMac}
                     </code>
                   </td>
                   <td className="p-4">
                     <code className="text-xs font-mono text-muted-foreground">
-                      {session.ipAddress}
+                      {session.ipAddress || 'N/A'}
                     </code>
                   </td>
-                  <td className="p-4 font-medium">{session.package}</td>
+                  <td className="p-4 font-medium">{session.package.name}</td>
                   <td className="p-4">
                     <div className="flex items-center gap-1.5">
-                      <Clock className="w-4 h-4 text-muted-foreground" />
-                      <span
-                        className={cn(
-                          session.status === "expiring" && "text-warning"
-                        )}
-                      >
-                        {session.timeRemaining}
+                      <Clock className={cn("w-4 h-4", isExpiring ? "text-warning" : "text-muted-foreground")} />
+                      <span className={cn(isExpiring && "text-warning")}>
+                        {session.timeRemainingFormatted}
                       </span>
                     </div>
                   </td>
                   <td className="p-4 text-muted-foreground">
-                    {session.dataUsed}
+                    <div className="text-sm">
+                      <div>↓ {session.bytesDownFormatted}</div>
+                      <div className="text-xs">↑ {session.bytesUpFormatted}</div>
+                    </div>
                   </td>
                   <td className="p-4">
                     <span
                       className={cn(
-                        "px-2.5 py-1 rounded-full text-xs font-medium capitalize",
-                        statusStyles[session.status]
+                        "px-2.5 py-1 rounded-full text-xs font-medium",
+                        statusStyles[session.status as keyof typeof statusStyles] || statusStyles.ACTIVE
                       )}
                     >
-                      {session.status}
+                      {session.status.toLowerCase()}
                     </span>
                   </td>
                   <td className="p-4">
@@ -169,11 +206,25 @@ export function ActiveSessionsTable() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem>View Details</DropdownMenuItem>
-                        <DropdownMenuItem>Extend Time</DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive">
-                          Disconnect
+                        <DropdownMenuItem onClick={() => handleViewDetails(session)}>
+                          View Details
                         </DropdownMenuItem>
+                        {session.status === 'ACTIVE' && (
+                          <>
+                            <DropdownMenuItem onClick={() => handleExtendSession(session.id, 60)}>
+                              Extend +1 Hour
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleExtendSession(session.id, 1440)}>
+                              Extend +1 Day
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              className="text-destructive"
+                              onClick={() => handleTerminateSession(session.id)}
+                            >
+                              Disconnect
+                            </DropdownMenuItem>
+                          </>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </td>

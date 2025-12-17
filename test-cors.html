@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CORS Test</title>
+</head>
+<body>
+    <h1>NetFlow CORS Test</h1>
+    <button onclick="testAPI()">Test API Connection</button>
+    <div id="result"></div>
+
+    <script>
+        async function testAPI() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Testing...';
+            
+            try {
+                // Test health endpoint
+                const response = await fetch('http://localhost:3001/api/test', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    resultDiv.innerHTML = `
+                        <h3>✅ API Connection Successful!</h3>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `❌ API Error: ${response.status} ${response.statusText}`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `❌ Connection Error: ${error.message}`;
+                console.error('API Test Error:', error);
+            }
+        }
+
+        // Test login
+        async function testLogin() {
+            try {
+                const response = await fetch('http://localhost:3001/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: 'admin@netflow.co.tz',
+                        password: 'admin123'
+                    })
+                });
+                
+                const data = await response.json();
+                console.log('Login test:', data);
+            } catch (error) {
+                console.error('Login test error:', error);
+            }
+        }
+
+        // Auto-test on load
+        window.onload = () => {
+            console.log('Current origin:', window.location.origin);
+            testAPI();
+        };
+    </script>
+</body>
+</html>

@@ -19,109 +19,120 @@ import {
   XCircle,
   Clock,
   Smartphone,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { adminApi } from "@/lib/api";
+import { useState, useEffect } from "react";
+import { toast } from "sonner";
 
 interface Payment {
   id: string;
-  transactionId: string;
+  sessionId: string;
+  packageId: string;
   amount: number;
-  package: string;
-  method: "mpesa" | "tigopesa" | "airtelmoney" | "voucher";
-  phone?: string;
-  voucherCode?: string;
-  status: "completed" | "pending" | "failed";
-  timestamp: string;
-  router: string;
+  currency: string;
+  paymentMethod: string;
+  paymentReference?: string;
+  phoneNumber?: string;
+  status: string;
+  paidAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  session: {
+    id: string;
+    deviceMac: string;
+    deviceName?: string;
+    router: {
+      id: string;
+      name: string;
+      location?: string;
+    };
+  };
+  package: {
+    id: string;
+    name: string;
+    duration: number;
+    price: number;
+  };
 }
 
-const mockPayments: Payment[] = [
-  {
-    id: "1",
-    transactionId: "TXN-001-2024",
-    amount: 500,
-    package: "24 Hours",
-    method: "mpesa",
-    phone: "+255712345678",
-    status: "completed",
-    timestamp: "2024-01-15 14:32:18",
-    router: "Main Lobby",
-  },
-  {
-    id: "2",
-    transactionId: "TXN-002-2024",
-    amount: 1000,
-    package: "7 Days",
-    method: "tigopesa",
-    phone: "+255754321098",
-    status: "completed",
-    timestamp: "2024-01-15 13:45:02",
-    router: "Cafe WiFi",
-  },
-  {
-    id: "3",
-    transactionId: "TXN-003-2024",
-    amount: 500,
-    package: "24 Hours",
-    method: "voucher",
-    voucherCode: "WIFI-A7X9K2",
-    status: "completed",
-    timestamp: "2024-01-15 12:18:44",
-    router: "Main Lobby",
-  },
-  {
-    id: "4",
-    transactionId: "TXN-004-2024",
-    amount: 5000,
-    package: "30 Days",
-    method: "mpesa",
-    phone: "+255789012345",
-    status: "pending",
-    timestamp: "2024-01-15 11:55:31",
-    router: "Conference Room",
-  },
-  {
-    id: "5",
-    transactionId: "TXN-005-2024",
-    amount: 500,
-    package: "24 Hours",
-    method: "airtelmoney",
-    phone: "+255678901234",
-    status: "failed",
-    timestamp: "2024-01-15 10:22:15",
-    router: "Cafe WiFi",
-  },
-];
-
-const methodConfig = {
-  mpesa: { label: "M-Pesa", color: "bg-green-500/10 text-green-500" },
-  tigopesa: { label: "Tigo Pesa", color: "bg-blue-500/10 text-blue-500" },
-  airtelmoney: { label: "Airtel Money", color: "bg-red-500/10 text-red-500" },
-  voucher: { label: "Voucher", color: "bg-purple-500/10 text-purple-500" },
+const methodConfig: Record<string, { label: string; color: string }> = {
+  MPESA: { label: "M-Pesa", color: "bg-green-500/10 text-green-500" },
+  TIGO_PESA: { label: "Tigo Pesa", color: "bg-blue-500/10 text-blue-500" },
+  AIRTEL_MONEY: { label: "Airtel Money", color: "bg-red-500/10 text-red-500" },
+  VOUCHER: { label: "Voucher", color: "bg-purple-500/10 text-purple-500" },
+  CASH: { label: "Cash", color: "bg-gray-500/10 text-gray-500" },
 };
 
-const statusConfig = {
-  completed: {
+const statusConfig: Record<string, { label: string; icon: any; color: string }> = {
+  COMPLETED: {
     label: "Completed",
     icon: CheckCircle,
     color: "text-success bg-success/10",
   },
-  pending: {
+  PENDING: {
     label: "Pending",
     icon: Clock,
     color: "text-warning bg-warning/10",
   },
-  failed: {
+  FAILED: {
     label: "Failed",
     icon: XCircle,
     color: "text-destructive bg-destructive/10",
   },
+  CANCELLED: {
+    label: "Cancelled",
+    icon: XCircle,
+    color: "text-muted-foreground bg-muted/10",
+  },
+  REFUNDED: {
+    label: "Refunded",
+    icon: XCircle,
+    color: "text-warning bg-warning/10",
+  },
 };
 
 export default function Payments() {
-  const totalRevenue = mockPayments
-    .filter((p) => p.status === "completed")
-    .reduce((sum, p) => sum + p.amount, 0);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [methodFilter, setMethodFilter] = useState("all");
+
+  useEffect(() => {
+    loadPayments();
+  }, []);
+
+  const loadPayments = async () => {
+    try {
+      setLoading(true);
+      const data = await adminApi.getPayments();
+      setPayments(data.payments || []);
+    } catch (error) {
+      console.error('Failed to load payments:', error);
+      toast.error('Failed to load payments');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredPayments = payments.filter((payment) => {
+    const matchesSearch =
+      payment.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (payment.paymentReference || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (payment.phoneNumber || '').includes(searchQuery) ||
+      payment.session.deviceMac.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesStatus = statusFilter === "all" || payment.status === statusFilter.toUpperCase();
+    const matchesMethod = methodFilter === "all" || payment.paymentMethod === methodFilter.toUpperCase();
+    
+    return matchesSearch && matchesStatus && matchesMethod;
+  });
+
+  const totalRevenue = payments
+    .filter((p) => p.status === "COMPLETED")
+    .reduce((sum, p) => sum + (p.amount / 100), 0);
 
   return (
     <DashboardLayout>
@@ -157,7 +168,7 @@ export default function Payments() {
             </div>
             <div>
               <p className="text-2xl font-bold">
-                {mockPayments.filter((p) => p.status === "completed").length}
+                {payments.filter((p) => p.status === "COMPLETED").length}
               </p>
               <p className="text-sm text-muted-foreground">Successful</p>
             </div>
@@ -168,7 +179,7 @@ export default function Payments() {
             </div>
             <div>
               <p className="text-2xl font-bold">
-                {mockPayments.filter((p) => p.status === "pending").length}
+                {payments.filter((p) => p.status === "PENDING").length}
               </p>
               <p className="text-sm text-muted-foreground">Pending</p>
             </div>
@@ -178,8 +189,8 @@ export default function Payments() {
               <TrendingUp className="w-6 h-6 text-accent" />
             </div>
             <div>
-              <p className="text-2xl font-bold">+18%</p>
-              <p className="text-sm text-muted-foreground">vs Last Week</p>
+              <p className="text-2xl font-bold">{payments.length}</p>
+              <p className="text-sm text-muted-foreground">Total Transactions</p>
             </div>
           </div>
         </div>
@@ -191,9 +202,11 @@ export default function Payments() {
             <Input
               placeholder="Search transactions..."
               className="pl-10"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          <Select defaultValue="all">
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-[180px]">
               <Filter className="w-4 h-4 mr-2" />
               <SelectValue placeholder="Status" />
@@ -203,9 +216,11 @@ export default function Payments() {
               <SelectItem value="completed">Completed</SelectItem>
               <SelectItem value="pending">Pending</SelectItem>
               <SelectItem value="failed">Failed</SelectItem>
+              <SelectItem value="cancelled">Cancelled</SelectItem>
+              <SelectItem value="refunded">Refunded</SelectItem>
             </SelectContent>
           </Select>
-          <Select defaultValue="all">
+          <Select value={methodFilter} onValueChange={setMethodFilter}>
             <SelectTrigger className="w-[180px]">
               <Smartphone className="w-4 h-4 mr-2" />
               <SelectValue placeholder="Method" />
@@ -213,9 +228,10 @@ export default function Payments() {
             <SelectContent>
               <SelectItem value="all">All Methods</SelectItem>
               <SelectItem value="mpesa">M-Pesa</SelectItem>
-              <SelectItem value="tigopesa">Tigo Pesa</SelectItem>
-              <SelectItem value="airtelmoney">Airtel Money</SelectItem>
+              <SelectItem value="tigo_pesa">Tigo Pesa</SelectItem>
+              <SelectItem value="airtel_money">Airtel Money</SelectItem>
               <SelectItem value="voucher">Voucher</SelectItem>
+              <SelectItem value="cash">Cash</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -237,9 +253,24 @@ export default function Payments() {
                 </tr>
               </thead>
               <tbody>
-                {mockPayments.map((payment) => {
-                  const method = methodConfig[payment.method];
-                  const status = statusConfig[payment.status];
+                {loading ? (
+                  <tr>
+                    <td colSpan={8} className="p-8 text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Loading payments...</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : filteredPayments.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="p-8 text-center text-muted-foreground">
+                      No payments found
+                    </td>
+                  </tr>
+                ) : filteredPayments.map((payment) => {
+                  const method = methodConfig[payment.paymentMethod] || { label: payment.paymentMethod, color: "bg-gray-500/10 text-gray-500" };
+                  const status = statusConfig[payment.status] || statusConfig.PENDING;
                   const StatusIcon = status.icon;
                   return (
                     <tr
@@ -248,16 +279,16 @@ export default function Payments() {
                     >
                       <td className="p-4">
                         <code className="text-sm font-mono text-primary">
-                          {payment.transactionId}
+                          {payment.paymentReference || payment.id.slice(0, 12)}
                         </code>
                       </td>
                       <td className="p-4">
                         <span className="font-semibold">
-                          {payment.amount.toLocaleString()} TZS
+                          {(payment.amount / 100).toLocaleString()} {payment.currency}
                         </span>
                       </td>
                       <td className="p-4">
-                        <span>{payment.package}</span>
+                        <span>{payment.package.name}</span>
                       </td>
                       <td className="p-4">
                         <span
@@ -270,22 +301,22 @@ export default function Payments() {
                         </span>
                       </td>
                       <td className="p-4">
-                        {payment.phone ? (
+                        {payment.phoneNumber ? (
                           <span className="text-sm text-muted-foreground">
-                            {payment.phone}
+                            {payment.phoneNumber}
                           </span>
                         ) : (
-                          <code className="text-xs font-mono bg-secondary px-2 py-0.5 rounded">
-                            {payment.voucherCode}
-                          </code>
+                          <span className="text-sm text-muted-foreground">
+                            {payment.session.deviceMac}
+                          </span>
                         )}
                       </td>
                       <td className="p-4">
-                        <span className="text-sm">{payment.router}</span>
+                        <span className="text-sm">{payment.session.router.name}</span>
                       </td>
                       <td className="p-4">
                         <span className="text-sm text-muted-foreground font-mono">
-                          {payment.timestamp}
+                          {new Date(payment.createdAt).toLocaleString()}
                         </span>
                       </td>
                       <td className="p-4">
