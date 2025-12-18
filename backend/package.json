@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/server-simple.ts",
     "dev:full": "tsx watch src/server.ts",
-    "build": "prisma generate && tsc --skipLibCheck --noEmitOnError false",
+    "build": "prisma generate",
     "start": "tsx src/server-simple.ts",
     "vercel-build": "prisma generate && tsc",
     "db:generate": "prisma generate",
