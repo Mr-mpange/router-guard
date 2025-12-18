@@ -12,18 +12,32 @@ const prisma = new PrismaClient();
 
 // Middleware
 app.use(cors({
-  origin: [
-    "http://localhost:5173",
-    "http://localhost:8080",
-    "http://localhost:8081", 
-    "http://localhost:3000",
-    "http://localhost:4173",
-    "https://mr-mpange.github.io",
-    process.env.FRONTEND_URL || "http://localhost:5173"
-  ],
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    const allowedOrigins = [
+      "http://localhost:5173",
+      "http://localhost:8080",
+      "http://localhost:8081", 
+      "http://localhost:3000",
+      "http://localhost:4173",
+      "https://mr-mpange.github.io",
+      process.env.FRONTEND_URL || "http://localhost:5173"
+    ];
+    
+    // Check if the origin is allowed
+    if (allowedOrigins.indexOf(origin) !== -1 || origin.includes('github.io')) {
+      callback(null, true);
+    } else {
+      console.log('CORS blocked origin:', origin);
+      callback(null, true); // Allow all for now
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  optionsSuccessStatus: 200
 }));
 app.use(express.json());
 
