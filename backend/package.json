@@ -2,12 +2,12 @@
   "name": "netflow-backend",
   "version": "1.0.0",
   "description": "NetFlow WiFi Management System Backend",
-  "main": "dist/server.js",
+  "main": "dist/server-simple.js",
   "scripts": {
     "dev": "tsx watch src/server-simple.ts",
     "dev:full": "tsx watch src/server.ts",
     "build": "tsc && prisma generate",
-    "start": "node dist/server.js",
+    "start": "node dist/server-simpl
     "vercel-build": "prisma generate && tsc",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
