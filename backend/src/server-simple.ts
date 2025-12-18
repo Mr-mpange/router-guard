@@ -18,6 +18,7 @@ app.use(cors({
     "http://localhost:8081", 
     "http://localhost:3000",
     "http://localhost:4173",
+    "https://mr-mpange.github.io",
     process.env.FRONTEND_URL || "http://localhost:5173"
   ],
   credentials: true,
