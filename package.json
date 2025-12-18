@@ -8,7 +8,10 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "start": "cd backend && npm run build && npm run start",
+    "build:full": "npm run build && cd backend && npm run build",
+    "setup:github-pages": "node scripts/setup-github-pages.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

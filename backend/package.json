@@ -6,8 +6,9 @@
   "scripts": {
     "dev": "tsx watch src/server-simple.ts",
     "dev:full": "tsx watch src/server.ts",
-    "build": "tsc",
+    "build": "tsc && prisma generate",
     "start": "node dist/server.js",
+    "vercel-build": "prisma generate && tsc",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",

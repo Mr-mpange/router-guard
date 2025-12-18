@@ -15,4 +15,13 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    outDir: "dist",
+    sourcemap: false,
+  },
+  define: {
+    'process.env.NODE_ENV': JSON.stringify(mode),
+  },
+  // Set base path for GitHub Pages deployment
+  base: process.env.NODE_ENV === 'production' ? '/your-repo-name/' : '/',
 }));
