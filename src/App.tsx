@@ -25,7 +25,10 @@ const App = () => (
       <Toaster />
       <Sonner />
       <AuthProvider>
-        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <BrowserRouter 
+          basename={import.meta.env.PROD ? '/router-guard' : ''}
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+        >
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<Login />} />
